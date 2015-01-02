@@ -10,9 +10,8 @@ Changes
 - Fixed tshark deprecated -R option for single-pass analysis. Uses -Y instead.
 - Fixed listing of network interfaces via `ifconfig`
 
-/!\
-- The `yersinia` screen session for the DTP attack does not work for some reason on my setup... Use `sudo yersinia dtp -attack 1 -interface en0` in a different terminal window while the script is waiting for the DTP attack to kick off.
-/!\
+
+- /!\ The `yersinia` screen session for the DTP attack does not work for some reason on my setup... Use `sudo yersinia dtp -attack 1 -interface en0` in a different terminal window while the script is waiting for the DTP attack to kick off. /!\
 
 License
 ========================
